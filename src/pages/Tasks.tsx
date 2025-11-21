@@ -16,12 +16,18 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardDescription,
+} from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Pencil, Trash2, Search } from 'lucide-react';
 import { toast } from 'sonner';
@@ -49,8 +55,8 @@ const Tasks = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
 
   const { data: tasks, isLoading } = useQuery({
     queryKey: ['tasks'],
@@ -59,7 +65,7 @@ const Tasks = () => {
         .from('tasks')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       return data as Task[];
     },
@@ -67,20 +73,16 @@ const Tasks = () => {
 
   const createMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const data = {
-        title: formData.get('title') as string,
-        description: formData.get('description') as string,
-        status: formData.get('status') as string,
-        priority: formData.get('priority') as string,
-      };
-
-      const validated = taskSchema.parse(data);
+      const validated = taskSchema.parse({
+        title: formData.get('title'),
+        description: formData.get('description'),
+        status: formData.get('status'),
+        priority: formData.get('priority'),
+      });
 
       const { error } = await supabase.from('tasks').insert({
-        title: validated.title,
+        ...validated,
         description: validated.description || null,
-        status: validated.status,
-        priority: validated.priority,
         user_id: user!.id,
       });
 
@@ -88,41 +90,31 @@ const Tasks = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      toast.success('Task created successfully');
+      toast.success('Task created!');
       setIsOpen(false);
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to create task');
-    },
+    onError: () => toast.error('Failed to create task'),
   });
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, formData }: { id: string; formData: FormData }) => {
-      const data = {
-        title: formData.get('title') as string,
-        description: formData.get('description') as string,
-        status: formData.get('status') as string,
-        priority: formData.get('priority') as string,
-      };
+      const validated = taskSchema.parse({
+        title: formData.get('title'),
+        description: formData.get('description'),
+        status: formData.get('status'),
+        priority: formData.get('priority'),
+      });
 
-      const validated = taskSchema.parse(data);
-
-      const { error } = await supabase
-        .from('tasks')
-        .update(validated)
-        .eq('id', id);
-
+      const { error } = await supabase.from('tasks').update(validated).eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      toast.success('Task updated successfully');
+      toast.success('Task updated');
       setIsOpen(false);
       setEditingTask(null);
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to update task');
-    },
+    onError: () => toast.error('Failed to update task'),
   });
 
   const deleteMutation = useMutation({
@@ -132,109 +124,95 @@ const Tasks = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      toast.success('Task deleted successfully');
+      toast.success('Task deleted');
     },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to delete task');
-    },
+    onError: () => toast.error('Failed to delete task'),
   });
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const formData = new FormData(e.currentTarget);
+    const data = new FormData(e.currentTarget);
 
-    if (editingTask) {
-      updateMutation.mutate({ id: editingTask.id, formData });
-    } else {
-      createMutation.mutate(formData);
-    }
+    editingTask
+      ? updateMutation.mutate({ id: editingTask.id, formData: data })
+      : createMutation.mutate(data);
   };
 
   const filteredTasks = tasks?.filter((task) => {
-    const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
-    const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
-    return matchesSearch && matchesStatus && matchesPriority;
+    const s = searchQuery.toLowerCase();
+    const matchSearch = task.title.toLowerCase().includes(s);
+    const matchStatus = statusFilter === 'all' || task.status === statusFilter;
+    const matchPriority = priorityFilter === 'all' || task.priority === priorityFilter;
+    return matchSearch && matchStatus && matchPriority;
   });
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high':
-        return 'bg-red-500/10 text-red-500 border-red-500/20';
-      case 'medium':
-        return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
-      case 'low':
-        return 'bg-green-500/10 text-green-500 border-green-500/20';
-      default:
-        return '';
-    }
+  const statusColors: Record<string, string> = {
+    pending: 'bg-gray-500/10 text-gray-600 border-gray-400/20',
+    in_progress: 'bg-blue-500/10 text-blue-600 border-blue-400/20',
+    completed: 'bg-green-500/10 text-green-600 border-green-400/20',
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-500/10 text-green-500 border-green-500/20';
-      case 'in_progress':
-        return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
-      case 'pending':
-        return 'bg-gray-500/10 text-gray-500 border-gray-500/20';
-      default:
-        return '';
-    }
+  const priorityColors: Record<string, string> = {
+    low: 'bg-green-500/10 text-green-600 border-green-400/20',
+    medium: 'bg-yellow-500/10 text-yellow-600 border-yellow-400/20',
+    high: 'bg-red-500/10 text-red-600 border-red-400/20',
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-8 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Tasks</h1>
-          <p className="text-muted-foreground">Manage and organize your tasks</p>
+          <h1 className="text-3xl font-bold tracking-tight">Tasks</h1>
+          <p className="text-muted-foreground">Manage and organize your work</p>
         </div>
+
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
             <Button
               onClick={() => setEditingTask(null)}
-              className="gradient-primary shadow-glow"
+              className="rounded-xl px-5 py-2 gradient-primary shadow-md hover:shadow-lg transition-all"
             >
               <Plus className="mr-2 h-4 w-4" />
-              New Task
+              Add Task
             </Button>
           </DialogTrigger>
-          <DialogContent>
+
+          <DialogContent className="rounded-2xl border bg-background/70 backdrop-blur shadow-xl">
             <DialogHeader>
-              <DialogTitle>{editingTask ? 'Edit Task' : 'Create New Task'}</DialogTitle>
+              <DialogTitle className="text-2xl font-semibold">
+                {editingTask ? 'Edit Task' : 'New Task'}
+              </DialogTitle>
               <DialogDescription>
-                {editingTask ? 'Update your task details' : 'Add a new task to your list'}
+                {editingTask ? 'Update your task details' : 'Create a new task'}
               </DialogDescription>
             </DialogHeader>
+
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">Title</Label>
+              <div>
+                <Label>Title</Label>
                 <Input
-                  id="title"
                   name="title"
                   defaultValue={editingTask?.title}
                   placeholder="Task title"
                   required
-                  maxLength={200}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
+
+              <div>
+                <Label>Description</Label>
                 <Textarea
-                  id="description"
                   name="description"
                   defaultValue={editingTask?.description || ''}
-                  placeholder="Task description (optional)"
-                  maxLength={1000}
+                  placeholder="Description (optional)"
                 />
               </div>
+
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
+                <div>
+                  <Label>Status</Label>
                   <Select name="status" defaultValue={editingTask?.status || 'pending'}>
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="pending">Pending</SelectItem>
@@ -243,11 +221,11 @@ const Tasks = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="priority">Priority</Label>
+                <div>
+                  <Label>Priority</Label>
                   <Select name="priority" defaultValue={editingTask?.priority || 'medium'}>
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Select priority" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="low">Low</SelectItem>
@@ -257,18 +235,19 @@ const Tasks = () => {
                   </Select>
                 </div>
               </div>
-              <Button type="submit" className="w-full gradient-primary">
-                {editingTask ? 'Update Task' : 'Create Task'}
+
+              <Button type="submit" className="w-full rounded-xl gradient-primary">
+                {editingTask ? 'Save Changes' : 'Create Task'}
               </Button>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      <Card>
+      <Card className="rounded-2xl shadow-md border bg-background/50 backdrop-blur">
         <CardHeader>
           <CardTitle>Filters</CardTitle>
-          <CardDescription>Search and filter your tasks</CardDescription>
+          <CardDescription>Search and filter tasks</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="relative">
@@ -277,32 +256,34 @@ const Tasks = () => {
               placeholder="Search tasks..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
+              className="pl-10"
             />
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
               <Label>Status</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="in_progress">In Progress</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+
+            <div>
               <Label>Priority</Label>
               <Select value={priorityFilter} onValueChange={setPriorityFilter}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Priorities</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
                   <SelectItem value="low">Low</SelectItem>
                   <SelectItem value="medium">Medium</SelectItem>
                   <SelectItem value="high">High</SelectItem>
@@ -315,16 +296,20 @@ const Tasks = () => {
 
       {isLoading ? (
         <div className="flex justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <div className="h-8 w-8 animate-spin border-4 border-primary border-t-transparent rounded-full"></div>
         </div>
-      ) : filteredTasks && filteredTasks.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      ) : filteredTasks?.length ? (
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {filteredTasks.map((task) => (
-            <Card key={task.id} className="shadow-md hover:shadow-lg transition-shadow">
+            <Card
+              key={task.id}
+              className="rounded-2xl border bg-background/70 backdrop-blur shadow-md hover:shadow-xl transition-all"
+            >
               <CardHeader>
-                <div className="flex items-start justify-between">
+                <div className="flex justify-between">
                   <CardTitle className="text-lg">{task.title}</CardTitle>
-                  <div className="flex gap-2">
+
+                  <div className="flex gap-1">
                     <Button
                       variant="ghost"
                       size="icon"
@@ -332,26 +317,32 @@ const Tasks = () => {
                         setEditingTask(task);
                         setIsOpen(true);
                       }}
+                      className="hover:bg-primary/10 rounded-lg"
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
+
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => deleteMutation.mutate(task.id)}
+                      className="hover:bg-destructive/10 rounded-lg"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
+
                 <CardDescription>{task.description || 'No description'}</CardDescription>
               </CardHeader>
+
               <CardContent>
                 <div className="flex gap-2">
-                  <Badge className={getStatusColor(task.status)} variant="outline">
+                  <Badge variant="outline" className={statusColors[task.status]}>
                     {task.status.replace('_', ' ')}
                   </Badge>
-                  <Badge className={getPriorityColor(task.priority)} variant="outline">
+
+                  <Badge variant="outline" className={priorityColors[task.priority]}>
                     {task.priority}
                   </Badge>
                 </div>
@@ -360,13 +351,9 @@ const Tasks = () => {
           ))}
         </div>
       ) : (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">
-              {searchQuery || statusFilter !== 'all' || priorityFilter !== 'all'
-                ? 'No tasks match your filters'
-                : 'No tasks yet. Create your first task to get started!'}
-            </p>
+        <Card className="rounded-xl border bg-background/40 backdrop-blur">
+          <CardContent className="py-12 text-center text-muted-foreground">
+            No tasks found.
           </CardContent>
         </Card>
       )}
