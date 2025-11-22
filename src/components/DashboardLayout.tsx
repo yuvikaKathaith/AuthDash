@@ -5,18 +5,15 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 export function DashboardLayout() {
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-gradient-subtle">
+      <div className="flex min-h-screen w-full">
         <AppSidebar />
         <div className="flex flex-1 flex-col">
-          <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b border-border/50 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60 px-6 shadow-sm">
-            <SidebarTrigger className="hover:bg-accent/50 transition-colors rounded-lg" />
+          <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
+            <SidebarTrigger />
             <div className="flex-1" />
-            {/* Add header actions here */}
           </header>
-          <main className="flex-1 p-8">
-            <div className="mx-auto max-w-7xl">
-              <Outlet />
-            </div>
+          <main className="flex-1 p-6">
+            <Outlet />
           </main>
         </div>
       </div>
