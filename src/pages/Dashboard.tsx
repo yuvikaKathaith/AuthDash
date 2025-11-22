@@ -140,10 +140,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-n}
-        onOpenChange={setIsCreateDialogOpen}
-        onTaskCreated={handleTaskCreated}
-      />
-    </div>
-  );
-}
